@@ -9,13 +9,14 @@ SHOT_RADIUS = 10
 SHOT_SPEED = 5
 
 SPACESHIP_SPEED = 4
+STARTING_LIFE = 3
 
 HAZARD_RADIUS = 15
 HAZARD_CHANCE = 0.03
 HAZARD_SPEED = 3
 
 WIN_LENGTH = 1600
-WIN_HEIGHT = 1600
+WIN_HEIGHT = 800
 
 CENTER = (WIN_LENGTH / 2, WIN_HEIGHT / 2)
 
@@ -28,10 +29,10 @@ BACKGROUND_COLOR = (20, 20, 20)
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
-
+LIGHT_BLUE = (144, 213, 255)
 
 """
-Rotate a point around another by angle
+    Rotate a point around another by angle
 """
 def rotate_point(p, around_p, angle):
     s = math.sin(math.radians(angle))
@@ -48,9 +49,10 @@ def rotate_point(p, around_p, angle):
 
 
 """
-handles movement of multiple objects, removes objects that go out of the screen
+    Handles movement of multiple object. 
+    If remove is true, removes objects that go out of the screen.
 """
-def handle_movement(to_move, speed, remove=True, rotate=False):
+def handle_movement(to_move, speed, rotate=False):
     to_remove = []
     for object in to_move:
         dir = object['direction'] if 'direction' in object else angle_to_direction(object['angle'])
@@ -58,22 +60,40 @@ def handle_movement(to_move, speed, remove=True, rotate=False):
         object['location'][0] += dir[0] * mult
         object['location'][1] += dir[1] * mult
 
-        size = object['surface'].get_size()
-        if remove and not -size[0] / 2 <= object['location'][0] <= WIN_LENGTH + size[0] / 2 or not -size[1] / 2 <= object['location'][1] <= WIN_HEIGHT + size[1] / 2:
-            to_remove.append(object)
         if rotate:
             object['angle'] = (object['angle'] + 1) % 360
             object['surface'] = pygame.transform.rotate(object['orig_surface'], object['angle'])
 
-    if remove:
-        for object in to_remove:
-            to_move.remove(object)
+        if is_object_out_of_screen(object, 1):
+            to_remove.append(object)
+
+    for object in to_remove:
+        to_move.remove(object)
 
 
+"""
+    Returns whether an object is out of the screen by percentage 
+    percentage=1 means the object need to be fully out of screen, 
+    percentage=0 means that the object need to be just touching out of screen
+"""
+def is_object_out_of_screen(object, percentage):
+    size = object['surface'].get_size()
+    size_coefficient = 0.5 - percentage
+    return not size_coefficient * size[0] <= object['location'][0] <= WIN_LENGTH - size_coefficient * size[0] or \
+            not size_coefficient * size[1] <= object['location'][1] <= WIN_HEIGHT - size_coefficient * size[1]
+
+"""
+    Returns the top left point (as a list) of a surface according to a center point
+"""
 def get_top_left(surface, center):
     return list(surface.get_rect(center = center).topleft)
 
 
+"""
+    Handles the collisions of the spaceship, shots and hazards. 
+    If a hazard hits the spaceship, it gets removed and the player is hit (handled in the main loop)
+    If a shot hits an hazard, both get removed
+"""
 def handle_collisions(spaceship, shots, hazards):
     spaceship_mask = pygame.mask.from_surface(spaceship['surface'])
     spaceship_top_left = get_top_left(spaceship['surface'], spaceship['location'])
@@ -103,27 +123,36 @@ def handle_collisions(spaceship, shots, hazards):
 
     return hit
 
-
-def draw(spaceship, shots, hazards):
+"""
+    Draws the objects of the game on screen
+"""
+def draw(objects, score, life, font):
     WIN.fill(BACKGROUND_COLOR)
-    for shot in shots:
-        WIN.blit(shot['surface'], get_top_left(shot['surface'], shot['location']))
-    spaceship_mask = pygame.mask.from_surface(spaceship['surface'])
-    
-    WIN.blit(spaceship['surface'], get_top_left(spaceship['surface'], spaceship['location']))
+    for object in objects:
+        WIN.blit(object['surface'], get_top_left(object['surface'], object['location']))
+        
+    score_text = font.render("Score: " + str(score) + " "*(3-len(str(score))), 1, LIGHT_BLUE)
+    life_text = font.render("Life: " + str(life) + " "*(len(str(STARTING_LIFE))-len(str(life))), 1, GREEN)
 
-    for hazard in hazards:
-        WIN.blit(hazard['surface'], get_top_left(hazard['surface'], hazard['location']))
-
+    WIN.blit(score_text, (0,0))
+    WIN.blit(life_text, (WIN_LENGTH - life_text.get_size()[0], 0))
     pygame.display.update()
 
-
+"""
+    Converts angle to direction
+"""
 def angle_to_direction(angle):
     return [math.cos(math.radians(angle)), math.sin(math.radians(angle))]
 
+"""
+    Returns the y value for an x on a line defined by two points
+"""
 def point_in_line(start_p, end_p, x):
     return ((end_p[1] - start_p[1]) / (end_p[0] - start_p[0])) * (x - start_p[0]) + start_p[1]
 
+"""
+    Creates a random polygon
+"""
 def create_polygon(max_points, min_width, max_width, min_height, max_height, color):
     num_points = random.randint(3, max_points)
     height = random.uniform(min_height, max_height)
@@ -176,6 +205,9 @@ def create_polygon(max_points, min_width, max_width, min_height, max_height, col
     pygame.draw.polygon(polygon, color, points)
     return polygon
 
+"""
+    Creates a new hazard in a random edge location
+"""
 def new_hazard(spaceship_location):
     side = random.randint(1, 4)
     match side:
@@ -196,6 +228,9 @@ def new_hazard(spaceship_location):
     hazard = create_polygon(10, 100, 200, 100, 200, RED)
     return {'location': [x,y], 'surface': hazard.copy(), 'orig_surface': hazard, 'angle': 0, 'direction': direction}
 
+"""
+    Creates a shot that comes out of the spaceship
+"""
 def new_shot(spaceship):
     direction = angle_to_direction(spaceship['angle'])
     shot = pygame.Surface((SHOT_RADIUS*2, SHOT_RADIUS*2))
@@ -206,27 +241,30 @@ def new_shot(spaceship):
     mult = (SPACESHIP_SIZE[1] / 2 - SHOT_RADIUS) / math.sqrt(direction[0]**2 + direction[1]**2)
     return {'location': [spaceship['location'][i] + direction[i] * mult for i in range(2)], 'surface': shot, 'direction': direction}
 
-
+"""
+    Main function, contains the game loop
+"""
 def main():
+    pygame.init()
+    font = pygame.font.SysFont("monospace", 50)
     clock = pygame.time.Clock()
     
     shots = []
     hazards = []
-    life = 10
+    life = STARTING_LIFE
     score = 0
-    spaceship = {'surface': SPACESHIP_IMAGE.copy(), 'location': list(CENTER), 'angle': 0} 
-    run = True
-    last_f = clock.get_time()
-    while life:
+    spaceship = {'surface': SPACESHIP_IMAGE.copy(), 'location': list(CENTER), 'angle': 0}
+    
+    to_quit = False
+    while life and not to_quit:
         if random.random() <= HAZARD_CHANCE:
             hazards.append(new_hazard(spaceship['location']))
         clock.tick(FPS)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                run = False
+                to_quit = True
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    x, y = angle_to_direction(spaceship['angle'])
                     shots.append(new_shot(spaceship))
 
         handle_movement(shots, SHOT_SPEED)
@@ -237,18 +275,34 @@ def main():
         score += shots_before - len(shots)
         keys = pygame.key.get_pressed()
         if bool(keys[pygame.K_LEFT]) != bool(keys[pygame.K_RIGHT]):
-                spaceship['angle'] = (spaceship['angle'] + (-1 if keys[pygame.K_LEFT] else 1) * SPACESHIP_SPEED) % 360  
+                orig_angle = spaceship['angle']
+                spaceship['angle'] = (spaceship['angle'] + (-1 if keys[pygame.K_LEFT] else 1) * SPACESHIP_SPEED) % 360
                 spaceship['surface'] = pygame.transform.rotate(SPACESHIP_IMAGE, -spaceship['angle'])
+                if is_object_out_of_screen(spaceship, 0.5):
+                    spaceship['angle'] = orig_angle
+                spaceship['surface'] = pygame.transform.rotate(SPACESHIP_IMAGE, -spaceship['angle'])
+        
+        orig_loc = spaceship['location'][:]
         if keys[pygame.K_UP]:
             handle_movement([spaceship], SPACESHIP_SPEED)
+            if is_object_out_of_screen(spaceship, 0.5):
+                spaceship['location'] = orig_loc
         if keys[pygame.K_DOWN]:
             handle_movement([spaceship], -SPACESHIP_SPEED)
-        #if keys[pygame.K_SPACE]:
-            #shots.append(new_shot(spaceship))
+            if is_object_out_of_screen(spaceship, 0.5):
+                spaceship['location'] = orig_loc
 
+        draw([spaceship, *shots, *hazards], score, life, font)
+    if not to_quit:
+        lost_text = font.render('GAME OVER!', 1, RED)
+        WIN.blit(lost_text, get_top_left(lost_text, CENTER))
+        pygame.display.update()
+        while not to_quit:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    to_quit = True
 
-        draw(spaceship, shots, hazards)        
-    print("score is", score)
+    print("Score is:", score)
     pygame.quit()
 
 if __name__ == '__main__':
