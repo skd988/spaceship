@@ -203,7 +203,6 @@ def create_polygon(max_points, min_width, max_width, min_height, max_height, col
             point_y = random.uniform(point_in_line(left_p, right_p, point_x) + distance, max_height)
         down_points += [(point_x, point_y)]
     
-    down_points = down_points[1:]
     points = up_points + down_points[::-1]
     polygon = pygame.Surface((width, height))
     polygon.fill(BACKGROUND_COLOR)
@@ -260,11 +259,10 @@ def game():
     life = STARTING_LIFE
     score = 0
     spaceship = {'surface': SPACESHIP_IMAGE.copy(), 'location': list(CENTER), 'angle': 0}
-    
+    pause = False
+
     to_quit = False
     while life and not to_quit:
-        if random.random() <= HAZARD_CHANCE:
-            hazards.append(new_hazard(spaceship['location']))
         clock.tick(fps)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -272,7 +270,13 @@ def game():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     shots.append(new_shot(spaceship))
+                if event.key == pygame.K_p:
+                    pause = not pause
+        if pause:
+            continue
 
+        if random.random() <= HAZARD_CHANCE:
+            hazards.append(new_hazard(spaceship['location']))
         handle_movement(shots, SHOT_SPEED)
         handle_movement(hazards, HAZARD_SPEED, rotate=True)
         shots_before = len(shots)
