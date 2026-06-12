@@ -11,9 +11,14 @@ SHOT_SPEED = 5
 SPACESHIP_SPEED = 4
 STARTING_LIFE = 3
 
-HAZARD_RADIUS = 15
 HAZARD_CHANCE = 0.03
 HAZARD_SPEED = 3
+
+MIN_HAZARD_WIDTH = 100
+MAX_HAZARD_WIDTH = 300
+MIN_HAZARD_HEIGHT = 100
+MAX_HAZARD_HEIGHT = 300
+MAX_HAZARD_POINTS = 7
 
 WIN_LENGTH = 1600
 WIN_HEIGHT = 800
@@ -23,11 +28,12 @@ CENTER = (WIN_LENGTH / 2, WIN_HEIGHT / 2)
 WIN = pygame.display.set_mode((WIN_LENGTH, WIN_HEIGHT))
 SPACESHIP_IMAGE = pygame.transform.scale(pygame.image.load(os.path.join('assets', 'spaceship.png')), SPACESHIP_SIZE)
 
-FPS = 60
+DEFAULT_FPS = 60
 
 BACKGROUND_COLOR = (20, 20, 20)
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
+YELLOW = (255, 255, 0)
 GREEN = (0, 255, 0)
 LIGHT_BLUE = (144, 213, 255)
 
@@ -210,22 +216,23 @@ def create_polygon(max_points, min_width, max_width, min_height, max_height, col
 """
 def new_hazard(spaceship_location):
     side = random.randint(1, 4)
+    hazard = create_polygon(MAX_HAZARD_POINTS, MIN_HAZARD_WIDTH, MAX_HAZARD_WIDTH, MIN_HAZARD_HEIGHT, MAX_HAZARD_HEIGHT, RED)
+    size = hazard.get_size()
     match side:
         case 1:
-            x = -HAZARD_RADIUS / 2
+            x = -size[0] / 2
             y = random.uniform(0, WIN_HEIGHT)
         case 2:
             x = random.uniform(0, WIN_LENGTH)
-            y = WIN_HEIGHT + HAZARD_RADIUS / 2
+            y = WIN_HEIGHT + size[1] / 2
         case 3:
-            x = WIN_LENGTH + HAZARD_RADIUS / 2
+            x = WIN_LENGTH + size[0] / 2
             y = random.uniform(0, WIN_HEIGHT)
         case 4:
             x = random.uniform(0, WIN_LENGTH)
-            y = -HAZARD_RADIUS / 2
+            y = -size[1] / 2
 
     direction = [(spaceship_location[0] - x) / WIN_LENGTH, (spaceship_location[1] - y) / WIN_HEIGHT]
-    hazard = create_polygon(10, 100, 200, 100, 200, RED)
     return {'location': [x,y], 'surface': hazard.copy(), 'orig_surface': hazard, 'angle': 0, 'direction': direction}
 
 """
@@ -242,13 +249,12 @@ def new_shot(spaceship):
     return {'location': [spaceship['location'][i] + direction[i] * mult for i in range(2)], 'surface': shot, 'direction': direction}
 
 """
-    Main function, contains the game loop
+    Runs the game, returns whether the game ended with a quit command
 """
-def main():
-    pygame.init()
+def game():
     font = pygame.font.SysFont("monospace", 50)
     clock = pygame.time.Clock()
-    
+    fps = DEFAULT_FPS
     shots = []
     hazards = []
     life = STARTING_LIFE
@@ -259,7 +265,7 @@ def main():
     while life and not to_quit:
         if random.random() <= HAZARD_CHANCE:
             hazards.append(new_hazard(spaceship['location']))
-        clock.tick(FPS)
+        clock.tick(fps)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 to_quit = True
@@ -292,17 +298,45 @@ def main():
             if is_object_out_of_screen(spaceship, 0.5):
                 spaceship['location'] = orig_loc
 
+        if keys[pygame.K_LEFTBRACKET]:
+            fps -= 1
+        if keys[pygame.K_RIGHTBRACKET]:
+            fps += 1
+
         draw([spaceship, *shots, *hazards], score, life, font)
-    if not to_quit:
-        lost_text = font.render('GAME OVER!', 1, RED)
-        WIN.blit(lost_text, get_top_left(lost_text, CENTER))
-        pygame.display.update()
-        while not to_quit:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
+    
+    return to_quit
+
+"""
+    Main function, calls the game and allows restarting
+"""
+def main():
+    pygame.init()
+    start = True
+    to_quit = False
+    while not to_quit:
+        if start:
+            to_quit = game()
+            start = False
+            if not to_quit:
+                font = pygame.font.SysFont('monospace', 50, bold=True)
+                lost_text = font.render('GAME OVER!', 1, YELLOW)
+                font = pygame.font.SysFont('monospace', 30, bold=True)
+                instructions = font.render('Press Space to restart, q to quit', 1, YELLOW)
+
+                WIN.blit(lost_text, get_top_left(lost_text, CENTER))
+                WIN.blit(instructions, get_top_left(instructions, (CENTER[0] - instructions.get_size()[1] / 2, CENTER[1] + 50)))
+                pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                to_quit = True
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    start = True
+                if event.key == pygame.K_q:
                     to_quit = True
 
-    print("Score is:", score)
     pygame.quit()
 
 if __name__ == '__main__':
