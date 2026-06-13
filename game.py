@@ -10,6 +10,7 @@ SHOT_SPEED = 5
 
 SPACESHIP_SPEED = 4
 STARTING_LIFE = 3
+STARTING_AMMO = 10
 
 HAZARD_CHANCE = 0.03
 HAZARD_SPEED = 3
@@ -18,7 +19,8 @@ MIN_HAZARD_WIDTH = 100
 MAX_HAZARD_WIDTH = 300
 MIN_HAZARD_HEIGHT = 100
 MAX_HAZARD_HEIGHT = 300
-MAX_HAZARD_POINTS = 7
+MAX_HAZARD_POINTS = 9
+HAZARD_BORDER = 2
 
 WIN_LENGTH = 1600
 WIN_HEIGHT = 800
@@ -33,6 +35,7 @@ DEFAULT_FPS = 60
 BACKGROUND_COLOR = (20, 20, 20)
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
+ORANGE = (205, 127, 50)
 YELLOW = (255, 255, 0)
 GREEN = (0, 255, 0)
 LIGHT_BLUE = (144, 213, 255)
@@ -159,16 +162,23 @@ def point_in_line(start_p, end_p, x):
 """
     Creates a random polygon
 """
-def create_polygon(max_points, min_width, max_width, min_height, max_height, color):
+def create_polygon(max_points, min_width, max_width, min_height, max_height, color, border_width=0, border_color=(0,0,0)):
+    #chooses number of points for the polygon - from 3 (triangle) to max points)
     num_points = random.randint(3, max_points)
+    
+    #chooses height and width of the surrounding the polygon surrounding rectangle
     height = random.uniform(min_height, max_height)
     width = random.uniform(min_width, max_width)
-    num_up_points = random.randint(0, num_points - 2)
-    num_down_points = num_points - num_up_points - 2
-    highest = random.randint(0, num_up_points + 1)
-    lowest = random.randint(1 if highest == 0 else 0, num_down_points + (0 if highest == num_up_points + 1 else 1))
 
-    distance = min(height, width) / num_points 
+    #chooses how many top points and bottom points there will be (in addition to the left most and right most points, which don't count)
+    num_top_points = random.randint(0, num_points - 2)
+    num_bottom_points = num_points - num_top_points - 2
+
+    #chooses the highest and lowest points
+    highest = random.randint(0, num_top_points + 1)
+    lowest = random.randint(1 if highest == 0 else 0, num_bottom_points + (0 if highest == num_top_points + 1 else 1))
+
+    #choose the left most point
     if highest == 0:
         left_p_y = 0
     elif lowest == 0:
@@ -176,38 +186,51 @@ def create_polygon(max_points, min_width, max_width, min_height, max_height, col
     else:
         left_p_y = random.uniform(0, height)
     left_p = (0, left_p_y)
-    if highest == num_up_points + 1:
+
+    #choose the right most point
+    if highest == num_top_points + 1:
         right_p_y = 0
-    elif lowest == num_down_points + 1:
+    elif lowest == num_bottom_points + 1:
         right_p_y = height
     else:
         right_p_y = random.uniform(0, height)
     right_p = (width, right_p_y)
 
-    up_points = [left_p]
-    for i in range(num_up_points):
-        point_x = random.uniform(up_points[-1][0] + distance, right_p[0] - distance * (num_up_points - i + 1))
+    distance = min(height, width) / num_points
+
+    #chooses top points: makes sure that no point passes the line between the left most and right most points
+    top_points = [left_p]
+    for i in range(num_top_points):
+        point_x = random.uniform(top_points[-1][0] + distance, right_p[0] - distance * (num_top_points - i + 1))
         if i + 1 == highest:
             point_y = 0
         else:
-            point_y = random.uniform(0, point_in_line(left_p, right_p, point_x) - distance)
-        up_points += [(point_x, point_y)]
-    up_points += [right_p]
-    down_points = [left_p]
+            max_y = point_in_line(left_p, right_p, point_x)
+            max_y = max(0, max_y - distance)
+            point_y = random.uniform(0, max_y)
+        top_points += [(point_x, point_y)]
+    top_points += [right_p]
 
-    for i in range(num_down_points):
-        point_x = random.uniform(down_points[-1][0] + distance, right_p[0] - distance * (num_down_points - i + 1))
+    #chooses bottom points: makes sure that no point passes the line between the left most and right most points
+    bottom_points = [left_p]
+    for i in range(num_bottom_points):
+        point_x = random.uniform(bottom_points[-1][0] + distance, right_p[0] - distance * (num_bottom_points - i + 1))
         if i + 1 == lowest:
             point_y = height
-        else:   
-            point_y = random.uniform(point_in_line(left_p, right_p, point_x) + distance, max_height)
-        down_points += [(point_x, point_y)]
+        else:
+            min_y = point_in_line(left_p, right_p, point_x)
+            min_y = min(min_y + distance, height)
+            point_y = random.uniform(min_y, height)
+        bottom_points += [(point_x, point_y)]
     
-    points = up_points + down_points[::-1]
-    polygon = pygame.Surface((width, height))
+    #points are all the top followed by the bottoms (bottoms are reversed so they will be sorted right to left)
+    points = top_points + bottom_points[::-1]
+    polygon = pygame.Surface((width + border_width * 2, height + border_width * 2))
     polygon.fill(BACKGROUND_COLOR)
     polygon.set_colorkey(BACKGROUND_COLOR)
     pygame.draw.polygon(polygon, color, points)
+    if border_width > 0:
+        pygame.draw.polygon(polygon, border_color, points, border_width)
     return polygon
 
 """
@@ -215,7 +238,7 @@ def create_polygon(max_points, min_width, max_width, min_height, max_height, col
 """
 def new_hazard(spaceship_location):
     side = random.randint(1, 4)
-    hazard = create_polygon(MAX_HAZARD_POINTS, MIN_HAZARD_WIDTH, MAX_HAZARD_WIDTH, MIN_HAZARD_HEIGHT, MAX_HAZARD_HEIGHT, RED)
+    hazard = create_polygon(MAX_HAZARD_POINTS, MIN_HAZARD_WIDTH, MAX_HAZARD_WIDTH, MIN_HAZARD_HEIGHT, MAX_HAZARD_HEIGHT, RED, HAZARD_BORDER, ORANGE)
     size = hazard.get_size()
     match side:
         case 1:
@@ -260,7 +283,7 @@ def game():
     score = 0
     spaceship = {'surface': SPACESHIP_IMAGE.copy(), 'location': list(CENTER), 'angle': 0}
     pause = False
-
+    invincible = False
     to_quit = False
     while life and not to_quit:
         clock.tick(fps)
@@ -272,6 +295,8 @@ def game():
                     shots.append(new_shot(spaceship))
                 if event.key == pygame.K_p:
                     pause = not pause
+                if event.key == pygame.K_i:
+                    invincible = not invincible
         if pause:
             continue
 
@@ -280,7 +305,7 @@ def game():
         handle_movement(shots, SHOT_SPEED)
         handle_movement(hazards, HAZARD_SPEED, rotate=True)
         shots_before = len(shots)
-        if handle_collisions(spaceship, shots, hazards):
+        if handle_collisions(spaceship, shots, hazards) and not invincible:
             life -= 1
         score += shots_before - len(shots)
         keys = pygame.key.get_pressed()
