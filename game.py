@@ -10,6 +10,7 @@ SPACESHIP_SIZE = (136, 160)
 
 SHOT_RADIUS = 10
 SHOT_SPEED = 5
+SHOT_COLOR = (255, 255, 255)
 
 SPACESHIP_SPEED = 4
 STARTING_LIFE = 5
@@ -21,11 +22,13 @@ AMMO_POWERUP_TYPE = 0
 AMMO_POWERUP_CHANCE = 0.003
 AMMO_POWERUP_RADIUS = 15
 AMMO_POWERUP_TO_ADD = 10
+AMMO_POWERUP_COLOR = (30, 50, 255)
 
 SHOOT_POWERUP_TYPE = 1
 SHOOT_POWERUP_CHANCE = 0.0005
 SHOOT_POWERUP_RADIUS = 7
 SHOOT_POWERUP_NUM_OF_SHOTS = 16
+SHOOT_POWERUP_COLOR = (255,223,0)
 
 BASE_HAZARD_CHANCE = 0.03
 HAZARD_SPEED = 3
@@ -36,9 +39,11 @@ MIN_HAZARD_HEIGHT = 100
 MAX_HAZARD_HEIGHT = 300
 MAX_HAZARD_POINTS = 9
 HAZARD_BORDER = 2
+HAZARD_FILL_COLOR = (150, 0, 0)
+HAZARD_BORDER_COLOR = (205, 127, 50)
 
 WIN_LENGTH = 1600
-WIN_HEIGHT = 800
+WIN_HEIGHT = 1000
 
 CENTER = (WIN_LENGTH / 2, WIN_HEIGHT / 2)
 
@@ -47,19 +52,17 @@ HAZARD_SHOT_EVENT = pygame.USEREVENT + 1
 POWERUP_COLLECTED_EVENT = pygame.USEREVENT + 2
 
 WIN = pygame.display.set_mode((WIN_LENGTH, WIN_HEIGHT))
-SPACESHIP_IMAGE = pygame.transform.scale(pygame.image.load(os.path.join('assets', 'spaceship.png')), SPACESHIP_SIZE)
 
 DEFAULT_FPS = 60
-
 BACKGROUND_COLOR = (20, 20, 20)
-WHITE = (255, 255, 255)
-RED = (255, 0, 0)
-ORANGE = (205, 127, 50)
-YELLOW = (255, 255, 0)
-GREEN = (0, 255, 0)
-LIGHT_BLUE = (144, 213, 255)
-BLUE = (30, 50, 255)
-GOLD = (255,223,0)
+
+SPACESHIP_IMAGE = pygame.transform.scale(pygame.image.load(os.path.join('assets', 'spaceship.png')), SPACESHIP_SIZE)
+
+GAME_OVER_TEXT_COLOR = (255, 255, 0)
+SCORE_TEXT_COLOR = (144, 213, 255)
+AMMO_TEXT_COLOR = (200,200,200)
+HEART_RADIUS = 10
+HEART_COLOR = (255, 0, 0)
 
 def direction_between_points(src, dest):
     """
@@ -158,12 +161,14 @@ def draw(objects, score, life, ammo, font):
     for object in objects:
         WIN.blit(object['surface'], get_top_left(object['surface'], object['location']))
     
-    score_text = font.render("Score: " + str(score) + " "*(3-len(str(score))), 1, LIGHT_BLUE)
-    life_text = font.render("Life: " + str(life) + " "*(len(str(STARTING_LIFE))-len(str(life))), 1, GREEN)
-    ammo_text = font.render("Ammo: " + str(ammo) + " "*(len(str(STARTING_AMMO))-len(str(ammo))), 1, WHITE)
+    score_text = font.render("Score: " + str(score) + " "*(3-len(str(score))), 1, SCORE_TEXT_COLOR)
+    #life_text = font.render("Life: " + str(life) + " "*(len(str(STARTING_LIFE))-len(str(life))), 1, GREEN)
+    for i in range(life):
+        pygame.draw.circle(WIN, HEART_COLOR, (WIN_LENGTH - HEART_RADIUS * 3 * (i+0.5), HEART_RADIUS * 1.5), HEART_RADIUS)
+    ammo_text = font.render("Ammo: " + str(ammo) + " "*(len(str(STARTING_AMMO))-len(str(ammo))), 1, AMMO_TEXT_COLOR)
     
     WIN.blit(score_text, (0,0))
-    WIN.blit(life_text, (WIN_LENGTH - life_text.get_size()[0], 0))
+    #WIN.blit(life_text, (WIN_LENGTH - life_text.get_size()[0], 0))
     WIN.blit(ammo_text, (0,WIN_HEIGHT - ammo_text.get_size()[1]))
     pygame.display.update()
 
@@ -279,7 +284,7 @@ def new_hazard(spaceship_location):
     """
         Creates a new hazard in a random edge location
     """
-    hazard = create_polygon(MAX_HAZARD_POINTS, MIN_HAZARD_WIDTH, MAX_HAZARD_WIDTH, MIN_HAZARD_HEIGHT, MAX_HAZARD_HEIGHT, RED, HAZARD_BORDER, ORANGE)
+    hazard = create_polygon(MAX_HAZARD_POINTS, MIN_HAZARD_WIDTH, MAX_HAZARD_WIDTH, MIN_HAZARD_HEIGHT, MAX_HAZARD_HEIGHT, HAZARD_FILL_COLOR, HAZARD_BORDER, HAZARD_BORDER_COLOR)
     angle = random.randint(0, 360)
     hazard = pygame.transform.rotate(hazard, angle)
 
@@ -295,7 +300,7 @@ def new_shot(spaceship, added_angle = 0):
     shot = pygame.Surface((SHOT_RADIUS*2, SHOT_RADIUS*2))
     shot.fill(BACKGROUND_COLOR)
     shot.set_colorkey(BACKGROUND_COLOR)
-    pygame.draw.circle(shot, WHITE, (SHOT_RADIUS, SHOT_RADIUS), SHOT_RADIUS)
+    pygame.draw.circle(shot, SHOT_COLOR, (SHOT_RADIUS, SHOT_RADIUS), SHOT_RADIUS)
 
     direction = angle_to_direction(spaceship['angle'] + added_angle)
     mult = SPACESHIP_SIZE[1] / 2 - SHOT_RADIUS
@@ -399,10 +404,10 @@ def game():
             hazards.append(new_hazard(spaceship['location']))
 
         if random.random() <= AMMO_POWERUP_CHANCE:
-            powerups.append(new_powerup(AMMO_POWERUP_TYPE, AMMO_POWERUP_RADIUS, BLUE))
+            powerups.append(new_powerup(AMMO_POWERUP_TYPE, AMMO_POWERUP_RADIUS, AMMO_POWERUP_COLOR))
 
         if random.random() <= SHOOT_POWERUP_CHANCE:
-            powerups.append(new_powerup(SHOOT_POWERUP_TYPE, SHOOT_POWERUP_RADIUS, GOLD))
+            powerups.append(new_powerup(SHOOT_POWERUP_TYPE, SHOOT_POWERUP_RADIUS, SHOOT_POWERUP_COLOR))
 
         handle_movement(shots, SHOT_SPEED)
         handle_movement(hazards, HAZARD_SPEED, rotate=True)
@@ -425,9 +430,9 @@ def main():
             start = False
             if not to_quit:
                 font = pygame.font.SysFont('monospace', 50, bold=True)
-                lost_text = font.render('GAME OVER!', 1, YELLOW)
+                lost_text = font.render('GAME OVER!', 1, GAME_OVER_TEXT_COLOR)
                 font = pygame.font.SysFont('monospace', 30, bold=True)
-                instructions = font.render('Press Enter to restart, q to quit', 1, YELLOW)
+                instructions = font.render('Press Enter to restart, q to quit', 1, GAME_OVER_TEXT_COLOR)
 
                 WIN.blit(lost_text, get_top_left(lost_text, CENTER))
                 WIN.blit(instructions, get_top_left(instructions, (CENTER[0] - instructions.get_size()[1] / 2, CENTER[1] + 50)))
