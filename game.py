@@ -3,7 +3,8 @@ import math
 import random
 import os
 
-LEFT, TOP, RIGHT, BOTTOM = tuple(range(4))
+EDGES = (-1, 1, 2, -2)
+LEFT, RIGHT, TOP, BOTTOM = EDGES
 
 SPACESHIP_SIZE = (136, 160)
 
@@ -11,13 +12,20 @@ SHOT_RADIUS = 10
 SHOT_SPEED = 5
 
 SPACESHIP_SPEED = 4
-STARTING_LIFE = 3
+STARTING_LIFE = 5
 STARTING_AMMO = 10
 
 POWERUP_SPEED = 5
 
+AMMO_POWERUP_TYPE = 0
 AMMO_POWERUP_CHANCE = 0.005
 AMMO_POWERUP_RADIUS = 15
+AMMO_POWERUP_TO_ADD = 10
+
+SHOOT_POWERUP_TYPE = 1
+SHOOT_POWERUP_CHANCE = 0.0005
+SHOOT_POWERUP_RADIUS = 7
+SHOOT_POWERUP_NUM_OF_SHOTS = 16
 
 HAZARD_CHANCE = 0.03
 HAZARD_SPEED = 3
@@ -51,6 +59,7 @@ YELLOW = (255, 255, 0)
 GREEN = (0, 255, 0)
 LIGHT_BLUE = (144, 213, 255)
 BLUE = (30, 50, 255)
+GOLD = (255,223,0)
 
 def direction_between_points(src, dest):
     """
@@ -249,7 +258,7 @@ def random_edge_point(size=(0,0), edge=None):
         Randomizes an edge point
     """
     if not edge:
-        edge = random.randint(0, 3)
+        edge = random.choice(EDGES)
 
     if edge == LEFT:
         x = -size[0] / 2
@@ -279,7 +288,7 @@ def new_hazard(spaceship_location):
     direction = direction_between_points(loc, spaceship_location)
     return {'location': loc, 'surface': hazard.copy(), 'orig_surface': hazard, 'angle': angle, 'direction': direction}
 
-def new_shot(spaceship):
+def new_shot(spaceship, added_angle = 0):
     """
         Creates a shot that comes out of the spaceship
     """
@@ -288,22 +297,22 @@ def new_shot(spaceship):
     shot.set_colorkey(BACKGROUND_COLOR)
     pygame.draw.circle(shot, WHITE, (SHOT_RADIUS, SHOT_RADIUS), SHOT_RADIUS)
 
-    direction = angle_to_direction(spaceship['angle'])
+    direction = angle_to_direction(spaceship['angle'] + added_angle)
     mult = SPACESHIP_SIZE[1] / 2 - SHOT_RADIUS
     loc = [spaceship['location'][i] + direction[i] * mult for i in range(2)]
     return {'location': loc, 'surface': shot, 'direction': direction}
 
-def new_powerup(type, radius):
+def new_powerup(type, radius, color):
     """
         Creates a new powerup that starts from one of the edges
     """
     powerup = pygame.Surface((radius*2, radius*2))
     powerup.fill(BACKGROUND_COLOR)
     powerup.set_colorkey(BACKGROUND_COLOR)
-    pygame.draw.circle(powerup, BLUE, (radius, radius), radius)
+    pygame.draw.circle(powerup, color, (radius, radius), radius)
 
     loc, edge = random_edge_point(powerup.get_size())
-    direction = direction_between_points(loc, random_edge_point(edge=(edge+2)%4)[0])
+    direction = direction_between_points(loc, random_edge_point(edge=-edge)[0])
     return {'location': loc, 'surface': powerup, 'direction': direction, 'type': type}
 
 def game():
@@ -319,7 +328,8 @@ def game():
     life = STARTING_LIFE
     ammo = STARTING_AMMO
     score = 0
-    spaceship = {'surface': SPACESHIP_IMAGE.copy(), 'location': list(CENTER), 'angle': 0}
+    angle = random.randint(0,360)
+    spaceship = {'surface': pygame.transform.rotate(SPACESHIP_IMAGE, -angle), 'location': list(CENTER), 'angle': angle}
     pause = False
     invincible = False
     to_quit = False
@@ -355,8 +365,12 @@ def game():
                 if event.powerup not in powerups:
                     continue
 
-                if event.powerup['type'] == 'ammo':
-                    ammo += 10
+                if event.powerup['type'] == AMMO_POWERUP_TYPE:
+                    ammo += AMMO_POWERUP_TO_ADD
+
+                elif event.powerup['type'] == SHOOT_POWERUP_TYPE:
+                    for i in range(SHOOT_POWERUP_NUM_OF_SHOTS):
+                        shots.append(new_shot(spaceship, i * 360 / SHOOT_POWERUP_NUM_OF_SHOTS))
                 powerups.remove(event.powerup)
 
         if pause:
@@ -385,7 +399,10 @@ def game():
             hazards.append(new_hazard(spaceship['location']))
 
         if random.random() <= AMMO_POWERUP_CHANCE:
-            powerups.append(new_powerup('ammo', AMMO_POWERUP_RADIUS))
+            powerups.append(new_powerup(AMMO_POWERUP_TYPE, AMMO_POWERUP_RADIUS, BLUE))
+
+        if random.random() <= SHOOT_POWERUP_CHANCE:
+            powerups.append(new_powerup(SHOOT_POWERUP_TYPE, SHOOT_POWERUP_RADIUS, GOLD))
 
         handle_movement(shots, SHOT_SPEED)
         handle_movement(hazards, HAZARD_SPEED, rotate=True)
@@ -410,7 +427,7 @@ def main():
                 font = pygame.font.SysFont('monospace', 50, bold=True)
                 lost_text = font.render('GAME OVER!', 1, YELLOW)
                 font = pygame.font.SysFont('monospace', 30, bold=True)
-                instructions = font.render('Press Space to restart, q to quit', 1, YELLOW)
+                instructions = font.render('Press Enter to restart, q to quit', 1, YELLOW)
 
                 WIN.blit(lost_text, get_top_left(lost_text, CENTER))
                 WIN.blit(instructions, get_top_left(instructions, (CENTER[0] - instructions.get_size()[1] / 2, CENTER[1] + 50)))
@@ -420,7 +437,7 @@ def main():
             if event.type == pygame.QUIT:
                 to_quit = True
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
+                if event.key == pygame.K_RETURN:
                     start = True
                 if event.key == pygame.K_q:
                     to_quit = True
