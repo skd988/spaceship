@@ -15,10 +15,10 @@ SPACESHIP_SPEED = 4
 STARTING_LIFE = 5
 STARTING_AMMO = 10
 
-POWERUP_SPEED = 5
+POWERUP_SPEED = 3.5
 
 AMMO_POWERUP_TYPE = 0
-AMMO_POWERUP_CHANCE = 0.005
+AMMO_POWERUP_CHANCE = 0.003
 AMMO_POWERUP_RADIUS = 15
 AMMO_POWERUP_TO_ADD = 10
 
@@ -27,7 +27,7 @@ SHOOT_POWERUP_CHANCE = 0.0005
 SHOOT_POWERUP_RADIUS = 7
 SHOOT_POWERUP_NUM_OF_SHOTS = 16
 
-HAZARD_CHANCE = 0.03
+BASE_HAZARD_CHANCE = 0.03
 HAZARD_SPEED = 3
 
 MIN_HAZARD_WIDTH = 100
@@ -395,7 +395,7 @@ def game():
         if keys[pygame.K_RIGHTBRACKET]:
             fps += 1
 
-        if random.random() <= HAZARD_CHANCE:
+        if random.random() <= BASE_HAZARD_CHANCE / (0.25*len(hazards)+1):
             hazards.append(new_hazard(spaceship['location']))
 
         if random.random() <= AMMO_POWERUP_CHANCE:
