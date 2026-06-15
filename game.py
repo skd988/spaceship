@@ -20,17 +20,23 @@ POWERUP_SPEED = 3.5
 
 AMMO_POWERUP_TYPE = 0
 AMMO_POWERUP_CHANCE = 0.003
-AMMO_POWERUP_RADIUS = 15
 AMMO_POWERUP_TO_ADD = 10
+AMMO_POWERUP_RADIUS = 15
 AMMO_POWERUP_COLOR = (30, 50, 255)
 
-SHOOT_POWERUP_TYPE = 1
+HEAL_POWERUP_TYPE = 1
+HEAL_POWERUP_CHANCE = 0.001
+HEAL_POWERUP_TO_ADD = 1
+HEAL_POWERUP_RADIUS = 10
+HEAL_POWERUP_COLOR = (0, 255, 0)
+
+SHOOT_POWERUP_TYPE = 2
 SHOOT_POWERUP_CHANCE = 0.0005
-SHOOT_POWERUP_RADIUS = 7
 SHOOT_POWERUP_NUM_OF_SHOTS = 16
+SHOOT_POWERUP_RADIUS = 7
 SHOOT_POWERUP_COLOR = (255,223,0)
 
-BASE_HAZARD_CHANCE = 0.03
+BASE_HAZARD_CHANCE = 0.05
 HAZARD_SPEED = 3
 
 MIN_HAZARD_WIDTH = 100
@@ -61,8 +67,13 @@ SPACESHIP_IMAGE = pygame.transform.scale(pygame.image.load(os.path.join('assets'
 GAME_OVER_TEXT_COLOR = (255, 255, 0)
 SCORE_TEXT_COLOR = (144, 213, 255)
 AMMO_TEXT_COLOR = (200,200,200)
+
 HEART_RADIUS = 10
 HEART_COLOR = (255, 0, 0)
+HEART = pygame.surface.Surface((HEART_RADIUS * 2, HEART_RADIUS * 2))
+pygame.draw.circle(HEART, HEART_COLOR, (HEART_RADIUS / 2, HEART_RADIUS / 2), HEART_RADIUS / 2, draw_top_left=True, draw_top_right=True)
+pygame.draw.circle(HEART, HEART_COLOR, (HEART_RADIUS * 1.5, HEART_RADIUS / 2), HEART_RADIUS / 2, draw_top_left=True, draw_top_right=True)
+pygame.draw.polygon(HEART, HEART_COLOR, ((0, HEART_RADIUS / 2), (HEART_RADIUS, HEART_RADIUS * 2), (HEART_RADIUS * 2, HEART_RADIUS / 2)))
 
 def direction_between_points(src, dest):
     """
@@ -161,14 +172,13 @@ def draw(objects, score, life, ammo, font):
     for object in objects:
         WIN.blit(object['surface'], get_top_left(object['surface'], object['location']))
     
-    score_text = font.render("Score: " + str(score) + " "*(3-len(str(score))), 1, SCORE_TEXT_COLOR)
-    #life_text = font.render("Life: " + str(life) + " "*(len(str(STARTING_LIFE))-len(str(life))), 1, GREEN)
     for i in range(life):
-        pygame.draw.circle(WIN, HEART_COLOR, (WIN_LENGTH - HEART_RADIUS * 3 * (i+0.5), HEART_RADIUS * 1.5), HEART_RADIUS)
+        WIN.blit(HEART, (WIN_LENGTH - HEART_RADIUS * 3 * (i+1), HEART_RADIUS * 1.5))
+
+    score_text = font.render("Score: " + str(score) + " "*(3-len(str(score))), 1, SCORE_TEXT_COLOR)
     ammo_text = font.render("Ammo: " + str(ammo) + " "*(len(str(STARTING_AMMO))-len(str(ammo))), 1, AMMO_TEXT_COLOR)
     
     WIN.blit(score_text, (0,0))
-    #WIN.blit(life_text, (WIN_LENGTH - life_text.get_size()[0], 0))
     WIN.blit(ammo_text, (0,WIN_HEIGHT - ammo_text.get_size()[1]))
     pygame.display.update()
 
@@ -373,9 +383,13 @@ def game():
                 if event.powerup['type'] == AMMO_POWERUP_TYPE:
                     ammo += AMMO_POWERUP_TO_ADD
 
+                elif event.powerup['type'] == HEAL_POWERUP_TYPE:
+                    life += HEAL_POWERUP_TO_ADD
+                    
                 elif event.powerup['type'] == SHOOT_POWERUP_TYPE:
                     for i in range(SHOOT_POWERUP_NUM_OF_SHOTS):
                         shots.append(new_shot(spaceship, i * 360 / SHOOT_POWERUP_NUM_OF_SHOTS))
+
                 powerups.remove(event.powerup)
 
         if pause:
@@ -400,12 +414,15 @@ def game():
         if keys[pygame.K_RIGHTBRACKET]:
             fps += 1
 
-        if random.random() <= BASE_HAZARD_CHANCE / (0.25*len(hazards)+1):
+        if random.random() <= BASE_HAZARD_CHANCE / (len(hazards)/4+1):
             hazards.append(new_hazard(spaceship['location']))
 
         if random.random() <= AMMO_POWERUP_CHANCE:
             powerups.append(new_powerup(AMMO_POWERUP_TYPE, AMMO_POWERUP_RADIUS, AMMO_POWERUP_COLOR))
 
+        if life < STARTING_LIFE and random.random() <= HEAL_POWERUP_CHANCE:
+            powerups.append(new_powerup(HEAL_POWERUP_TYPE, HEAL_POWERUP_RADIUS, HEAL_POWERUP_COLOR))
+            
         if random.random() <= SHOOT_POWERUP_CHANCE:
             powerups.append(new_powerup(SHOOT_POWERUP_TYPE, SHOOT_POWERUP_RADIUS, SHOOT_POWERUP_COLOR))
 
