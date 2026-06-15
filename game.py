@@ -12,7 +12,8 @@ SHOT_RADIUS = 10
 SHOT_SPEED = 5
 SHOT_COLOR = (255, 255, 255)
 
-SPACESHIP_SPEED = 4
+SPACESHIP_MAX_SPEED = 5
+SPACESHIP_SPEED_INCREMENTS = 0.05
 STARTING_LIFE = 5
 STARTING_AMMO = 10
 
@@ -342,6 +343,8 @@ def game():
     powerups = []
     life = STARTING_LIFE
     ammo = STARTING_AMMO
+    speed = 0
+    rotate_speed = 0
     score = 0
     angle = random.randint(0,360)
     spaceship = {'surface': pygame.transform.rotate(SPACESHIP_IMAGE, -angle), 'location': list(CENTER), 'angle': angle}
@@ -397,17 +400,29 @@ def game():
 
         keys = pygame.key.get_pressed()
         if bool(keys[pygame.K_LEFT]) != bool(keys[pygame.K_RIGHT]):
-            orig_angle = spaceship['angle']
-            spaceship['angle'] = (spaceship['angle'] + (1 if keys[pygame.K_RIGHT] else -1) * SPACESHIP_SPEED) % 360
-            spaceship['surface'] = pygame.transform.rotate(SPACESHIP_IMAGE, -spaceship['angle'])
-            if is_object_out_of_screen(spaceship, 0.5):
-                spaceship['angle'] = orig_angle
-
+            if keys[pygame.K_RIGHT]:
+                rotate_speed = min(rotate_speed + SPACESHIP_SPEED_INCREMENTS, SPACESHIP_MAX_SPEED)
+            else:
+                rotate_speed = max(rotate_speed - SPACESHIP_SPEED_INCREMENTS, -SPACESHIP_MAX_SPEED)
+            
         if bool(keys[pygame.K_UP]) != bool(keys[pygame.K_DOWN]):
-            orig_loc = spaceship['location'][:]
-            handle_movement([spaceship], SPACESHIP_SPEED * (1 if keys[pygame.K_UP] else -1))
-            if is_object_out_of_screen(spaceship, 0.5):
-                spaceship['location'] = orig_loc
+            if keys[pygame.K_UP]:
+                speed = min(speed + SPACESHIP_SPEED_INCREMENTS, SPACESHIP_MAX_SPEED)
+            else:
+                speed = max(speed - SPACESHIP_SPEED_INCREMENTS, -SPACESHIP_MAX_SPEED)
+
+
+        orig_loc = spaceship['location'][:]
+        handle_movement([spaceship], speed)
+        if is_object_out_of_screen(spaceship, 0.5):
+            spaceship['location'] = orig_loc
+
+        orig_angle = spaceship['angle']
+        spaceship['angle'] = (spaceship['angle'] + rotate_speed) % 360
+        spaceship['surface'] = pygame.transform.rotate(SPACESHIP_IMAGE, -spaceship['angle'])
+        if is_object_out_of_screen(spaceship, 0.5):
+            spaceship['angle'] = orig_angle
+
 
         if keys[pygame.K_LEFTBRACKET]:
             fps -= 1
