@@ -48,8 +48,10 @@ HAZARD_BORDER = 2
 HAZARD_FILL_COLOR = (150, 0, 0)
 HAZARD_BORDER_COLOR = (205, 127, 50)
 
-WIN_LENGTH = 1600
-WIN_HEIGHT = 1000
+pygame.init()
+INFO = pygame.display.Info()
+WIN_LENGTH = INFO.current_w
+WIN_HEIGHT = INFO.current_h
 
 CENTER = (WIN_LENGTH / 2, WIN_HEIGHT / 2)
 
