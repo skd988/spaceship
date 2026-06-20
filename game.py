@@ -360,9 +360,10 @@ def game():
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE and not pause:
-                    if ammo > 0:
+                    if ammo > 0 or invincible:
                         shots.append(new_shot(spaceship))
-                        ammo -= 1
+                        if not invincible:
+                            ammo -= 1
                 if event.key == pygame.K_p:
                     pause = not pause
                 if event.key == pygame.K_i:
