@@ -15,10 +15,13 @@ DEFAULT_FPS = 60
 EDGES = (-1, 1, 2, -2)
 LEFT, RIGHT, TOP, BOTTOM = EDGES
 
+SPACESHIP_TYPE = 0
 SPACESHIP_HEIGHT = WIN_HEIGHT * (17/135)
 SPACESHIP_IMAGE_PATH = 'assets\\spaceship.png'
-SPACESHIP_SPEED = WIN_HEIGHT / 300
+SPACESHIP_SPEED = WIN_HEIGHT / 200
+SPACESHIP_ROTATE_SPEED = WIN_HEIGHT / 350
 
+SHOT_TYPE = 1
 SHOT_RADIUS = WIN_HEIGHT / 108
 SHOT_SPEED = SPACESHIP_SPEED * 1.25
 SHOT_COLOR = (255, 255, 255)
@@ -26,26 +29,28 @@ SHOT_COLOR = (255, 255, 255)
 STARTING_LIFE = 5
 STARTING_AMMO = 10
 
+POWERUP_TYPE = 2
 POWERUP_SPEED = SPACESHIP_SPEED * 0.9
 
-AMMO_POWERUP_TYPE = 0
+AMMO_POWERUP_POWER = 0
 AMMO_POWERUP_CHANCE = 0.003
 AMMO_POWERUP_TO_ADD = 10
 AMMO_POWERUP_RADIUS = SHOT_RADIUS * 1.5
 AMMO_POWERUP_COLOR = (30, 50, 255)
 
-HEAL_POWERUP_TYPE = 1
+HEAL_POWERUP_POWER = 1
 HEAL_POWERUP_CHANCE = 0.001
 HEAL_POWERUP_TO_ADD = 1
 HEAL_POWERUP_RADIUS = SHOT_RADIUS
 HEAL_POWERUP_COLOR = (0, 255, 0)
 
-SHOOT_POWERUP_TYPE = 2
+SHOOT_POWERUP_POWER = 2
 SHOOT_POWERUP_CHANCE = 0.0005
 SHOOT_POWERUP_NUM_OF_SHOTS = 16
 SHOOT_POWERUP_RADIUS = SHOT_RADIUS * 0.7
 SHOOT_POWERUP_COLOR = (255,223,0)
 
+HAZARD_TYPE = 3
 BASE_HAZARD_CHANCE = 0.05
 HAZARD_SPEED = SPACESHIP_SPEED * 0.75
 
@@ -55,13 +60,14 @@ MIN_HAZARD_HEIGHT = WIN_HEIGHT / 10
 MAX_HAZARD_HEIGHT = WIN_HEIGHT / 3
 MAX_HAZARD_POINTS = 9
 HAZARD_BORDER = 2
+MAX_ROTATE_SPEED = 1
 HAZARD_FILL_COLOR = (150, 0, 0)
 HAZARD_BORDER_COLOR = (205, 127, 50)
 
 SPACESHIP_HIT_EVENT = pygame.USEREVENT + 0
 HAZARD_SHOT_EVENT = pygame.USEREVENT + 1
 POWERUP_COLLECTED_EVENT = pygame.USEREVENT + 2
-
+OBJECT_OUT_OF_SCREEN_EVENT = pygame.USEREVENT + 3
 BACKGROUND_COLOR = (20, 20, 20)
 
 GAME_OVER_TEXT_COLOR = (255, 255, 0)
@@ -71,6 +77,8 @@ AMMO_TEXT_COLOR = (200,200,200)
 HEART_RADIUS = SHOT_RADIUS
 HEART_COLOR = (255, 0, 0)
 HEART = pygame.surface.Surface((HEART_RADIUS * 2, HEART_RADIUS * 2))
+HEART.fill(BACKGROUND_COLOR)
+HEART.set_colorkey(BACKGROUND_COLOR)
 pygame.draw.circle(HEART, HEART_COLOR, (HEART_RADIUS / 2, HEART_RADIUS / 2), HEART_RADIUS / 2, draw_top_left=True, draw_top_right=True)
 pygame.draw.circle(HEART, HEART_COLOR, (HEART_RADIUS * 1.5, HEART_RADIUS / 2), HEART_RADIUS / 2, draw_top_left=True, draw_top_right=True)
 pygame.draw.polygon(HEART, HEART_COLOR, ((0, HEART_RADIUS / 2), (HEART_RADIUS, HEART_RADIUS * 2), (HEART_RADIUS * 2, HEART_RADIUS / 2)))
@@ -99,37 +107,60 @@ def rotate_point(p, around_p, angle):
     new = [around_p[0] + x, around_p[1] + y]
     return new
 
-def handle_movement(to_move, speed, rotate=False):
+def mult_direction(direction, mult):
+    """
+        Multiplies direction vector by a multiplier, such that the distance is the original distance times the multiplier
+    """
+    return [c * math.sqrt(abs(mult)) * (1 if mult >= 0 else -1) for c in direction]
+
+def handle_movement(objects_lists):
     """
         Handles movement of multiple object. 
-        If remove is true, removes objects that go out of the screen.
+        Raises event for objects that go out of the screen.
     """
-    to_remove = []
-    for object in to_move:
-        dir = object['direction'] if 'direction' in object else angle_to_direction(object['angle'])
-        object['location'][0] += dir[0] * speed
-        object['location'][1] += dir[1] * speed
+    for to_move in objects_lists:
+        for obj in to_move:
+            dir = obj['direction']
+            obj['location'][0] += dir[0]
+            obj['location'][1] += dir[1]
 
-        if rotate:
-            object['angle'] = (object['angle'] + 1) % 360
-            object['surface'] = pygame.transform.rotate(object['orig_surface'], object['angle'])
+            if 'rotate' in obj and obj['rotate'] != 0:
+                obj['angle'] = (obj['angle'] + obj['rotate']) % 360
+                obj['surface'] = pygame.transform.rotate(obj['orig_surface'], obj['angle'])
 
-        if is_object_out_of_screen(object, 1):
-            to_remove.append(object)
+            if is_object_out_of_screen(obj, 1):
+                pygame.event.post(pygame.event.Event(OBJECT_OUT_OF_SCREEN_EVENT, object=obj))
 
-    for object in to_remove:
-        to_move.remove(object)
+def handle_keyboard_movement_input_normal(spaceship, keys):
+    """
+        Handles keyboard input:
+        Up: move ship forwards
+        Down: move ship backwards
+        Right: rotate ship clockwise
+        Left: rotate ship counter clockwise
+        If up and down aren't pressed, ship stops.
+        If right and left aren't pressed, ship doesn't rotate.
+    """
+    if bool(keys[pygame.K_LEFT]) != bool(keys[pygame.K_RIGHT]):
+        spaceship['rotate'] = (1 if keys[pygame.K_LEFT] else -1) * SPACESHIP_ROTATE_SPEED
+    else:
+        spaceship['rotate'] = 0
 
-def is_object_out_of_screen(object, percentage):
+    if bool(keys[pygame.K_UP]) != bool(keys[pygame.K_DOWN]):
+        spaceship['direction'] = mult_direction(angle_to_direction(-spaceship['angle']), SPACESHIP_SPEED * (1 if keys[pygame.K_UP] else -1))
+    else:
+        spaceship['direction'] = [0, 0]
+        
+def is_object_out_of_screen(obj, percentage):
     """
         Returns whether an object is out of the screen by percentage 
         percentage=1 means the object need to be fully out of screen, 
         percentage=0 means that the object need to be just touching out of screen
     """
-    size = object['surface'].get_size()
+    size = obj['surface'].get_size()
     size_coefficient = 0.5 - percentage
-    return not size_coefficient * size[0] <= object['location'][0] <= WIN_WIDTH - size_coefficient * size[0] or \
-            not size_coefficient * size[1] <= object['location'][1] <= WIN_HEIGHT - size_coefficient * size[1]
+    return not size_coefficient * size[0] <= obj['location'][0] <= WIN_WIDTH - size_coefficient * size[0] or \
+            not size_coefficient * size[1] <= obj['location'][1] <= WIN_HEIGHT - size_coefficient * size[1]
 
 def get_top_left(surface, center):
     """
@@ -169,8 +200,8 @@ def draw(objects, score, life, ammo, font):
         Draws the objects of the game on screen
     """
     WIN.fill(BACKGROUND_COLOR)
-    for object in objects:
-        WIN.blit(object['surface'], get_top_left(object['surface'], object['location']))
+    for obj in objects:
+        WIN.blit(obj['surface'], get_top_left(obj['surface'], obj['location']))
     
     for i in range(life):
         WIN.blit(HEART, (WIN_WIDTH - HEART_RADIUS * 3 * (i+1), HEART_RADIUS * 1.5))
@@ -301,7 +332,8 @@ def new_hazard(spaceship_location):
     loc = random_edge_point(hazard.get_size())[0]
 
     direction = direction_between_points(loc, spaceship_location)
-    return {'location': loc, 'surface': hazard.copy(), 'orig_surface': hazard, 'angle': angle, 'direction': direction}
+    return {'type': HAZARD_TYPE, 'surface': hazard.copy(), 'orig_surface': hazard, 'location': loc, 'direction': mult_direction(direction, HAZARD_SPEED), 
+            'angle': angle, 'rotate': random.randint(1, MAX_ROTATE_SPEED) * random.choice([-1, 1])}
 
 def new_shot(spaceship, added_angle = 0):
     """
@@ -312,12 +344,12 @@ def new_shot(spaceship, added_angle = 0):
     shot.set_colorkey(BACKGROUND_COLOR)
     pygame.draw.circle(shot, SHOT_COLOR, (SHOT_RADIUS, SHOT_RADIUS), SHOT_RADIUS)
 
-    direction = angle_to_direction(spaceship['angle'] + added_angle)
-    mult = spaceship['image'].get_height() / 2 - SHOT_RADIUS
+    direction = angle_to_direction(-spaceship['angle'] + added_angle)
+    mult = spaceship['orig_surface'].get_width() / 2 - SHOT_RADIUS
     loc = [spaceship['location'][i] + direction[i] * mult for i in range(2)]
-    return {'location': loc, 'surface': shot, 'direction': direction}
+    return {'type': SHOT_TYPE, 'surface': shot, 'location': loc, 'direction': mult_direction(direction, SHOT_SPEED)}
 
-def new_powerup(type, radius, color):
+def new_powerup(power, radius, color):
     """
         Creates a new powerup that starts from one of the edges
     """
@@ -328,13 +360,13 @@ def new_powerup(type, radius, color):
 
     loc, edge = random_edge_point(powerup.get_size())
     direction = direction_between_points(loc, random_edge_point(edge=-edge)[0])
-    return {'location': loc, 'surface': powerup, 'direction': direction, 'type': type}
+    return {'type': POWERUP_TYPE, 'surface': powerup, 'location': loc, 'direction': mult_direction(direction, POWERUP_SPEED), 'power': power}
 
 def game():
     """
         Runs the game, returns whether the game ended with a quit command
     """
-    font = pygame.font.SysFont("monospace", 50)
+    font = pygame.font.SysFont('monospace', 50)
     clock = pygame.time.Clock()
     fps = DEFAULT_FPS
     shots = []
@@ -345,8 +377,10 @@ def game():
     score = 0
     angle = random.randint(0,360)
     spaceship_image = pygame.image.load(SPACESHIP_IMAGE_PATH)
-    spaceship_image = pygame.transform.scale(spaceship_image, ((spaceship_image.get_width() / spaceship_image.get_height()) * SPACESHIP_HEIGHT, SPACESHIP_HEIGHT))
-    spaceship = {'image': spaceship_image, 'surface': pygame.transform.rotate(spaceship_image, -angle), 'location': list(CENTER), 'angle': angle}
+    spaceship_image = pygame.transform.scale(spaceship_image, 
+                                             ((spaceship_image.get_width() / spaceship_image.get_height()) * SPACESHIP_HEIGHT, SPACESHIP_HEIGHT))
+    spaceship = {'type': SPACESHIP_TYPE, 'orig_surface': spaceship_image, 'surface': pygame.transform.rotate(spaceship_image, angle), 
+                 'location': list(CENTER), 'direction': [0,0], 'angle': angle, 'rotate': 0}
     pause = False
     invincible = False
     to_quit = False
@@ -370,6 +404,8 @@ def game():
                     invincible = not invincible
                 if event.key == pygame.K_ESCAPE:
                     to_quit = True
+                if event.key == pygame.K_BACKSLASH:
+                    fps = DEFAULT_FPS
 
             elif event.type == SPACESHIP_HIT_EVENT:
                 if not invincible:
@@ -389,58 +425,57 @@ def game():
                 if event.powerup not in powerups:
                     continue
 
-                if event.powerup['type'] == AMMO_POWERUP_TYPE:
+                if event.powerup['power'] == AMMO_POWERUP_POWER:
                     ammo += AMMO_POWERUP_TO_ADD
 
-                elif event.powerup['type'] == HEAL_POWERUP_TYPE:
+                elif event.powerup['power'] == HEAL_POWERUP_POWER:
                     life += HEAL_POWERUP_TO_ADD
                     
-                elif event.powerup['type'] == SHOOT_POWERUP_TYPE:
+                elif event.powerup['power'] == SHOOT_POWERUP_POWER:
                     for i in range(SHOOT_POWERUP_NUM_OF_SHOTS):
                         shots.append(new_shot(spaceship, i * 360 / SHOOT_POWERUP_NUM_OF_SHOTS))
 
                 powerups.remove(event.powerup)
 
+            elif event.type == OBJECT_OUT_OF_SCREEN_EVENT:
+                obj = event.object
+                if obj['type'] == SHOT_TYPE:
+                    shots.remove(obj)
+                elif obj['type'] == HAZARD_TYPE:
+                    hazards.remove(obj)
+                elif obj['type'] == POWERUP_TYPE:
+                    powerups.remove(obj)
+
         if pause:
             continue
 
         keys = pygame.key.get_pressed()
-        if bool(keys[pygame.K_LEFT]) != bool(keys[pygame.K_RIGHT]):
-            orig_angle = spaceship['angle']
-            spaceship['angle'] = (spaceship['angle'] + (1 if keys[pygame.K_RIGHT] else -1) * SPACESHIP_SPEED) % 360
-            spaceship['surface'] = pygame.transform.rotate(spaceship['image'], -spaceship['angle'])
-            if is_object_out_of_screen(spaceship, 0.5):
-                spaceship['angle'] = orig_angle
+        handle_keyboard_movement_input_normal(spaceship, keys)
 
-        if bool(keys[pygame.K_UP]) != bool(keys[pygame.K_DOWN]):
-            orig_loc = spaceship['location'][:]
-            handle_movement([spaceship], SPACESHIP_SPEED * (1 if keys[pygame.K_UP] else -1))
-            if is_object_out_of_screen(spaceship, 0.5):
-                spaceship['location'] = orig_loc
-
-        if keys[pygame.K_LEFTBRACKET]:
-            fps -= 1
         if keys[pygame.K_RIGHTBRACKET]:
             fps += 1
+        if keys[pygame.K_LEFTBRACKET] and fps > 0:
+            fps -= 1
 
         if random.random() <= BASE_HAZARD_CHANCE / (len(hazards)/4+1):
             hazards.append(new_hazard(spaceship['location']))
 
         if random.random() <= AMMO_POWERUP_CHANCE:
-            powerups.append(new_powerup(AMMO_POWERUP_TYPE, AMMO_POWERUP_RADIUS, AMMO_POWERUP_COLOR))
+            powerups.append(new_powerup(AMMO_POWERUP_POWER, AMMO_POWERUP_RADIUS, AMMO_POWERUP_COLOR))
 
         if life < STARTING_LIFE and random.random() <= HEAL_POWERUP_CHANCE:
-            powerups.append(new_powerup(HEAL_POWERUP_TYPE, HEAL_POWERUP_RADIUS, HEAL_POWERUP_COLOR))
+            powerups.append(new_powerup(HEAL_POWERUP_POWER, HEAL_POWERUP_RADIUS, HEAL_POWERUP_COLOR))
             
         if random.random() <= SHOOT_POWERUP_CHANCE:
-            powerups.append(new_powerup(SHOOT_POWERUP_TYPE, SHOOT_POWERUP_RADIUS, SHOOT_POWERUP_COLOR))
+            powerups.append(new_powerup(SHOOT_POWERUP_POWER, SHOOT_POWERUP_RADIUS, SHOOT_POWERUP_COLOR))
 
-        handle_movement(shots, SHOT_SPEED)
-        handle_movement(hazards, HAZARD_SPEED, rotate=True)
-        handle_movement(powerups, POWERUP_SPEED)
+        orig_spaceship_loc = spaceship['location'][:]
+        handle_movement([[spaceship], shots, hazards, powerups])
+        if is_object_out_of_screen(spaceship, 0.5):
+            spaceship['location'] = orig_spaceship_loc
+
         handle_collisions(spaceship, shots, hazards, powerups)
         draw([*shots, spaceship, *hazards, *powerups], score, life, ammo, font)
-
     return to_quit
 
 def main():
