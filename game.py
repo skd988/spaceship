@@ -18,19 +18,21 @@ LEFT, RIGHT, TOP, BOTTOM = EDGES
 SPACESHIP_TYPE = 0
 SPACESHIP_HEIGHT = WIN_HEIGHT * (17/135)
 SPACESHIP_IMAGE_PATH = 'assets\\spaceship.png'
-SPACESHIP_SPEED = WIN_HEIGHT / 200
-SPACESHIP_ROTATE_SPEED = WIN_HEIGHT / 350
+SPACESHIP_MAX_SPEED = WIN_HEIGHT / 200
+SPACESHIP_SPEED_INCREMENTS = SPACESHIP_MAX_SPEED / 50
+SPACESHIP_MAX_ROTATE_SPEED = WIN_HEIGHT / 350
+SPACESHIP_ROTATE_SPEED_INCREMENTS = SPACESHIP_MAX_ROTATE_SPEED / 50
 
 SHOT_TYPE = 1
 SHOT_RADIUS = WIN_HEIGHT / 108
-SHOT_SPEED = SPACESHIP_SPEED * 1.25
+SHOT_SPEED = SPACESHIP_MAX_SPEED * 1.25
 SHOT_COLOR = (255, 255, 255)
 
 STARTING_LIFE = 5
 STARTING_AMMO = 10
 
 POWERUP_TYPE = 2
-POWERUP_SPEED = SPACESHIP_SPEED * 0.9
+POWERUP_SPEED = SPACESHIP_MAX_SPEED * 0.9
 
 AMMO_POWERUP_POWER = 0
 AMMO_POWERUP_CHANCE = 0.003
@@ -52,7 +54,7 @@ SHOOT_POWERUP_COLOR = (255,223,0)
 
 HAZARD_TYPE = 3
 BASE_HAZARD_CHANCE = 0.05
-HAZARD_SPEED = SPACESHIP_SPEED * 0.75
+HAZARD_SPEED = SPACESHIP_MAX_SPEED * 0.75
 
 MIN_HAZARD_WIDTH = WIN_HEIGHT / 10
 MAX_HAZARD_WIDTH = WIN_HEIGHT / 3
@@ -70,11 +72,14 @@ POWERUP_COLLECTED_EVENT = pygame.USEREVENT + 2
 OBJECT_OUT_OF_SCREEN_EVENT = pygame.USEREVENT + 3
 BACKGROUND_COLOR = (20, 20, 20)
 
-GAME_OVER_TEXT_COLOR = (255, 255, 0)
+GAME_OVER_TEXT_COLOR = (235, 163, 70)
+FONT = 'Times New Roman'
 SCORE_TEXT_COLOR = (144, 213, 255)
 AMMO_TEXT_COLOR = (200,200,200)
+GAME_FONT_SIZE = int(WIN_HEIGHT / 15)
+GAME_OVER_FONT_SIZE = int(WIN_HEIGHT / 8)
 
-HEART_RADIUS = SHOT_RADIUS
+HEART_RADIUS = WIN_HEIGHT / 108
 HEART_COLOR = (255, 0, 0)
 HEART = pygame.surface.Surface((HEART_RADIUS * 2, HEART_RADIUS * 2))
 HEART.fill(BACKGROUND_COLOR)
@@ -131,9 +136,9 @@ def handle_movement(objects_lists):
             if is_object_out_of_screen(obj, 1):
                 pygame.event.post(pygame.event.Event(OBJECT_OUT_OF_SCREEN_EVENT, object=obj))
 
-def handle_keyboard_movement_input_normal(spaceship, keys):
+def handle_keyboard_input_movement_normal(spaceship, keys):
     """
-        Handles keyboard input:
+        Handles keyboard movement input:
         Up: move ship forwards
         Down: move ship backwards
         Right: rotate ship clockwise
@@ -142,15 +147,46 @@ def handle_keyboard_movement_input_normal(spaceship, keys):
         If right and left aren't pressed, ship doesn't rotate.
     """
     if bool(keys[pygame.K_LEFT]) != bool(keys[pygame.K_RIGHT]):
-        spaceship['rotate'] = (1 if keys[pygame.K_LEFT] else -1) * SPACESHIP_ROTATE_SPEED
+        spaceship['rotate'] = (1 if keys[pygame.K_LEFT] else -1) * SPACESHIP_MAX_ROTATE_SPEED
     else:
         spaceship['rotate'] = 0
 
     if bool(keys[pygame.K_UP]) != bool(keys[pygame.K_DOWN]):
-        spaceship['direction'] = mult_direction(angle_to_direction(-spaceship['angle']), SPACESHIP_SPEED * (1 if keys[pygame.K_UP] else -1))
+        spaceship['direction'] = mult_direction(angle_to_direction(-spaceship['angle']), SPACESHIP_MAX_SPEED * (1 if keys[pygame.K_UP] else -1))
     else:
         spaceship['direction'] = [0, 0]
-        
+    speed = math.sqrt(sum([c ** 2 for c in spaceship['direction']]))
+
+    if(speed > SPACESHIP_MAX_SPEED):
+        spaceship['direction'][0] *= SPACESHIP_MAX_SPEED / speed
+        spaceship['direction'][1] *= SPACESHIP_MAX_SPEED / speed
+
+def handle_keyboard_input_movement_physics(spaceship, keys):
+    """
+        Handles keyboard movement input:
+        Up: accelerates forwards
+        Down: accelerates backwards
+        Right: accelerates rotation clockwise
+        Left: accelerates rotation counter clockwise
+    """                
+    if bool(keys[pygame.K_LEFT]) != bool(keys[pygame.K_RIGHT]):
+        if keys[pygame.K_LEFT]:
+            spaceship['rotate'] = min(spaceship['rotate'] + SPACESHIP_SPEED_INCREMENTS, SPACESHIP_MAX_ROTATE_SPEED)
+        else:
+            spaceship['rotate'] = max(spaceship['rotate'] - SPACESHIP_SPEED_INCREMENTS, -SPACESHIP_MAX_ROTATE_SPEED)
+
+    if bool(keys[pygame.K_UP]) != bool(keys[pygame.K_DOWN]):
+        direction = angle_to_direction(-spaceship['angle'])
+        to_add = mult_direction(direction, SPACESHIP_SPEED_INCREMENTS * (1 if keys[pygame.K_UP] else -1))
+        spaceship['direction'][0] += to_add[0]
+        spaceship['direction'][1] += to_add[1]
+
+        speed = sum([c ** 2 for c in spaceship['direction']])
+
+        if(speed > SPACESHIP_MAX_SPEED):
+           spaceship['direction'][0] *= SPACESHIP_MAX_SPEED / speed
+           spaceship['direction'][1] *= SPACESHIP_MAX_SPEED / speed
+
 def is_object_out_of_screen(obj, percentage):
     """
         Returns whether an object is out of the screen by percentage 
@@ -326,14 +362,12 @@ def new_hazard(spaceship_location):
         Creates a new hazard in a random edge location
     """
     hazard = create_polygon(MAX_HAZARD_POINTS, MIN_HAZARD_WIDTH, MAX_HAZARD_WIDTH, MIN_HAZARD_HEIGHT, MAX_HAZARD_HEIGHT, HAZARD_FILL_COLOR, HAZARD_BORDER, HAZARD_BORDER_COLOR)
-    angle = random.randint(0, 360)
-    hazard = pygame.transform.rotate(hazard, angle)
 
     loc = random_edge_point(hazard.get_size())[0]
 
     direction = direction_between_points(loc, spaceship_location)
     return {'type': HAZARD_TYPE, 'surface': hazard.copy(), 'orig_surface': hazard, 'location': loc, 'direction': mult_direction(direction, HAZARD_SPEED), 
-            'angle': angle, 'rotate': random.randint(1, MAX_ROTATE_SPEED) * random.choice([-1, 1])}
+            'angle': 0, 'rotate': random.randint(1, MAX_ROTATE_SPEED) * random.choice([-1, 1])}
 
 def new_shot(spaceship, added_angle = 0):
     """
@@ -362,11 +396,11 @@ def new_powerup(power, radius, color):
     direction = direction_between_points(loc, random_edge_point(edge=-edge)[0])
     return {'type': POWERUP_TYPE, 'surface': powerup, 'location': loc, 'direction': mult_direction(direction, POWERUP_SPEED), 'power': power}
 
-def game():
+def game(physics_enabled=False):
     """
         Runs the game, returns whether the game ended with a quit command
     """
-    font = pygame.font.SysFont('monospace', 50)
+    font = pygame.font.SysFont(FONT, 50)
     clock = pygame.time.Clock()
     fps = DEFAULT_FPS
     shots = []
@@ -398,8 +432,10 @@ def game():
                         shots.append(new_shot(spaceship))
                         if not invincible:
                             ammo -= 1
-                if event.key == pygame.K_p:
+                if event.key == pygame.K_RETURN:
                     pause = not pause
+                if event.key == pygame.K_p:
+                    physics_enabled = not physics_enabled
                 if event.key == pygame.K_i:
                     invincible = not invincible
                 if event.key == pygame.K_ESCAPE:
@@ -450,7 +486,10 @@ def game():
             continue
 
         keys = pygame.key.get_pressed()
-        handle_keyboard_movement_input_normal(spaceship, keys)
+        if not physics_enabled:
+            handle_keyboard_input_movement_normal(spaceship, keys)
+        else:
+            handle_keyboard_input_movement_physics(spaceship, keys)
 
         if keys[pygame.K_RIGHTBRACKET]:
             fps += 1
@@ -473,6 +512,8 @@ def game():
         handle_movement([[spaceship], shots, hazards, powerups])
         if is_object_out_of_screen(spaceship, 0.5):
             spaceship['location'] = orig_spaceship_loc
+            spaceship['direction'] = mult_direction(spaceship['direction'], -1)
+            spaceship['rotate'] *= -1
 
         handle_collisions(spaceship, shots, hazards, powerups)
         draw([*shots, spaceship, *hazards, *powerups], score, life, ammo, font)
@@ -485,18 +526,20 @@ def main():
     pygame.init()
     start = True
     to_quit = False
+    physics_enabled = False
     while not to_quit:
         if start:
-            to_quit = game()
+            to_quit = game(physics_enabled)
             start = False
             if not to_quit:
-                font = pygame.font.SysFont('monospace', 50, bold=True)
+                font = pygame.font.SysFont(FONT, GAME_OVER_FONT_SIZE, bold=True)
                 lost_text = font.render('GAME OVER!', 1, GAME_OVER_TEXT_COLOR)
-                font = pygame.font.SysFont('monospace', 30, bold=True)
+                font = pygame.font.SysFont(FONT, GAME_OVER_FONT_SIZE//2, bold=True)
                 instructions = font.render('Press Enter to restart, Escape to quit', 1, GAME_OVER_TEXT_COLOR)
-
+                physics_description = font.render('Press p to toggle physics mode', 1, GAME_OVER_TEXT_COLOR)
                 WIN.blit(lost_text, get_top_left(lost_text, CENTER))
-                WIN.blit(instructions, get_top_left(instructions, (CENTER[0] - instructions.get_size()[1] / 2, CENTER[1] + 50)))
+                WIN.blit(instructions, get_top_left(instructions, (CENTER[0] - instructions.get_size()[1] / 2, CENTER[1] + GAME_OVER_FONT_SIZE)))
+                WIN.blit(physics_description, get_top_left(physics_description, (CENTER[0] - physics_description.get_size()[1] / 2, CENTER[1] + GAME_OVER_FONT_SIZE * 1.5)))
                 pygame.display.update()
 
         for event in pygame.event.get():
@@ -507,6 +550,8 @@ def main():
                     start = True
                 if event.key == pygame.K_ESCAPE:
                     to_quit = True
+                if event.key == pygame.K_p:
+                    physics_enabled = not physics_enabled
 
     pygame.quit()
 
