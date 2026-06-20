@@ -2,75 +2,73 @@ import pygame
 import math
 import random
 import os
+pygame.init()
+
+INFO = pygame.display.Info()
+WIN_WIDTH = INFO.current_w
+WIN_HEIGHT = INFO.current_h
+
+WIN = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
+CENTER = (WIN_WIDTH / 2, WIN_HEIGHT / 2)
+DEFAULT_FPS = 60
 
 EDGES = (-1, 1, 2, -2)
 LEFT, RIGHT, TOP, BOTTOM = EDGES
 
-SPACESHIP_SIZE = (136, 160)
+SPACESHIP_HEIGHT = WIN_HEIGHT * (17/135)
+SPACESHIP_IMAGE_PATH = 'assets\\spaceship.png'
+SPACESHIP_SPEED = WIN_HEIGHT / 300
 
-SHOT_RADIUS = 10
-SHOT_SPEED = 5
+SHOT_RADIUS = WIN_HEIGHT / 108
+SHOT_SPEED = SPACESHIP_SPEED * 1.25
 SHOT_COLOR = (255, 255, 255)
 
-SPACESHIP_SPEED = 4
 STARTING_LIFE = 5
 STARTING_AMMO = 10
 
-POWERUP_SPEED = 3.5
+POWERUP_SPEED = SPACESHIP_SPEED * 0.9
 
 AMMO_POWERUP_TYPE = 0
 AMMO_POWERUP_CHANCE = 0.003
 AMMO_POWERUP_TO_ADD = 10
-AMMO_POWERUP_RADIUS = 15
+AMMO_POWERUP_RADIUS = SHOT_RADIUS * 1.5
 AMMO_POWERUP_COLOR = (30, 50, 255)
 
 HEAL_POWERUP_TYPE = 1
 HEAL_POWERUP_CHANCE = 0.001
 HEAL_POWERUP_TO_ADD = 1
-HEAL_POWERUP_RADIUS = 10
+HEAL_POWERUP_RADIUS = SHOT_RADIUS
 HEAL_POWERUP_COLOR = (0, 255, 0)
 
 SHOOT_POWERUP_TYPE = 2
 SHOOT_POWERUP_CHANCE = 0.0005
 SHOOT_POWERUP_NUM_OF_SHOTS = 16
-SHOOT_POWERUP_RADIUS = 7
+SHOOT_POWERUP_RADIUS = SHOT_RADIUS * 0.7
 SHOOT_POWERUP_COLOR = (255,223,0)
 
 BASE_HAZARD_CHANCE = 0.05
-HAZARD_SPEED = 3
+HAZARD_SPEED = SPACESHIP_SPEED * 0.75
 
-MIN_HAZARD_WIDTH = 100
-MAX_HAZARD_WIDTH = 300
-MIN_HAZARD_HEIGHT = 100
-MAX_HAZARD_HEIGHT = 300
+MIN_HAZARD_WIDTH = WIN_HEIGHT / 10
+MAX_HAZARD_WIDTH = WIN_HEIGHT / 3
+MIN_HAZARD_HEIGHT = WIN_HEIGHT / 10
+MAX_HAZARD_HEIGHT = WIN_HEIGHT / 3
 MAX_HAZARD_POINTS = 9
 HAZARD_BORDER = 2
 HAZARD_FILL_COLOR = (150, 0, 0)
 HAZARD_BORDER_COLOR = (205, 127, 50)
 
-pygame.init()
-INFO = pygame.display.Info()
-WIN_LENGTH = INFO.current_w
-WIN_HEIGHT = INFO.current_h
-
-CENTER = (WIN_LENGTH / 2, WIN_HEIGHT / 2)
-
 SPACESHIP_HIT_EVENT = pygame.USEREVENT + 0
 HAZARD_SHOT_EVENT = pygame.USEREVENT + 1
 POWERUP_COLLECTED_EVENT = pygame.USEREVENT + 2
 
-WIN = pygame.display.set_mode((WIN_LENGTH, WIN_HEIGHT))
-
-DEFAULT_FPS = 60
 BACKGROUND_COLOR = (20, 20, 20)
-
-SPACESHIP_IMAGE = pygame.transform.scale(pygame.image.load(os.path.join('assets', 'spaceship.png')), SPACESHIP_SIZE)
 
 GAME_OVER_TEXT_COLOR = (255, 255, 0)
 SCORE_TEXT_COLOR = (144, 213, 255)
 AMMO_TEXT_COLOR = (200,200,200)
 
-HEART_RADIUS = 10
+HEART_RADIUS = SHOT_RADIUS
 HEART_COLOR = (255, 0, 0)
 HEART = pygame.surface.Surface((HEART_RADIUS * 2, HEART_RADIUS * 2))
 pygame.draw.circle(HEART, HEART_COLOR, (HEART_RADIUS / 2, HEART_RADIUS / 2), HEART_RADIUS / 2, draw_top_left=True, draw_top_right=True)
@@ -130,7 +128,7 @@ def is_object_out_of_screen(object, percentage):
     """
     size = object['surface'].get_size()
     size_coefficient = 0.5 - percentage
-    return not size_coefficient * size[0] <= object['location'][0] <= WIN_LENGTH - size_coefficient * size[0] or \
+    return not size_coefficient * size[0] <= object['location'][0] <= WIN_WIDTH - size_coefficient * size[0] or \
             not size_coefficient * size[1] <= object['location'][1] <= WIN_HEIGHT - size_coefficient * size[1]
 
 def get_top_left(surface, center):
@@ -175,7 +173,7 @@ def draw(objects, score, life, ammo, font):
         WIN.blit(object['surface'], get_top_left(object['surface'], object['location']))
     
     for i in range(life):
-        WIN.blit(HEART, (WIN_LENGTH - HEART_RADIUS * 3 * (i+1), HEART_RADIUS * 1.5))
+        WIN.blit(HEART, (WIN_WIDTH - HEART_RADIUS * 3 * (i+1), HEART_RADIUS * 1.5))
 
     score_text = font.render("Score: " + str(score) + " "*(3-len(str(score))), 1, SCORE_TEXT_COLOR)
     ammo_text = font.render("Ammo: " + str(ammo) + " "*(len(str(STARTING_AMMO))-len(str(ammo))), 1, AMMO_TEXT_COLOR)
@@ -281,13 +279,13 @@ def random_edge_point(size=(0,0), edge=None):
         x = -size[0] / 2
         y = random.uniform(0, WIN_HEIGHT)
     elif edge == TOP:
-        x = random.uniform(0, WIN_LENGTH)
+        x = random.uniform(0, WIN_WIDTH)
         y = WIN_HEIGHT + size[1] / 2
     elif edge == RIGHT:
-        x = WIN_LENGTH + size[0] / 2
+        x = WIN_WIDTH + size[0] / 2
         y = random.uniform(0, WIN_HEIGHT)
     elif edge == BOTTOM:
-        x = random.uniform(0, WIN_LENGTH)
+        x = random.uniform(0, WIN_WIDTH)
         y = -size[1] / 2
 
     return [x,y], edge
@@ -315,7 +313,7 @@ def new_shot(spaceship, added_angle = 0):
     pygame.draw.circle(shot, SHOT_COLOR, (SHOT_RADIUS, SHOT_RADIUS), SHOT_RADIUS)
 
     direction = angle_to_direction(spaceship['angle'] + added_angle)
-    mult = SPACESHIP_SIZE[1] / 2 - SHOT_RADIUS
+    mult = spaceship['image'].get_height() / 2 - SHOT_RADIUS
     loc = [spaceship['location'][i] + direction[i] * mult for i in range(2)]
     return {'location': loc, 'surface': shot, 'direction': direction}
 
@@ -346,7 +344,9 @@ def game():
     ammo = STARTING_AMMO
     score = 0
     angle = random.randint(0,360)
-    spaceship = {'surface': pygame.transform.rotate(SPACESHIP_IMAGE, -angle), 'location': list(CENTER), 'angle': angle}
+    spaceship_image = pygame.image.load(SPACESHIP_IMAGE_PATH)
+    spaceship_image = pygame.transform.scale(spaceship_image, ((spaceship_image.get_width() / spaceship_image.get_height()) * SPACESHIP_HEIGHT, SPACESHIP_HEIGHT))
+    spaceship = {'image': spaceship_image, 'surface': pygame.transform.rotate(spaceship_image, -angle), 'location': list(CENTER), 'angle': angle}
     pause = False
     invincible = False
     to_quit = False
@@ -357,6 +357,7 @@ def game():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 to_quit = True
+
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE and not pause:
                     if ammo > 0:
@@ -366,11 +367,15 @@ def game():
                     pause = not pause
                 if event.key == pygame.K_i:
                     invincible = not invincible
+                if event.key == pygame.K_ESCAPE:
+                    to_quit = True
+
             elif event.type == SPACESHIP_HIT_EVENT:
                 if not invincible:
                     life -= 1
                 if life:
                     hazards.remove(event.hazard)
+
             elif event.type == HAZARD_SHOT_EVENT:
                 if event.hazard not in hazards or event.shot not in shots:
                     continue
@@ -378,6 +383,7 @@ def game():
                 hazards.remove(event.hazard)
                 shots.remove(event.shot)
                 score += 1
+
             elif event.type == POWERUP_COLLECTED_EVENT:
                 if event.powerup not in powerups:
                     continue
@@ -401,7 +407,7 @@ def game():
         if bool(keys[pygame.K_LEFT]) != bool(keys[pygame.K_RIGHT]):
             orig_angle = spaceship['angle']
             spaceship['angle'] = (spaceship['angle'] + (1 if keys[pygame.K_RIGHT] else -1) * SPACESHIP_SPEED) % 360
-            spaceship['surface'] = pygame.transform.rotate(SPACESHIP_IMAGE, -spaceship['angle'])
+            spaceship['surface'] = pygame.transform.rotate(spaceship['image'], -spaceship['angle'])
             if is_object_out_of_screen(spaceship, 0.5):
                 spaceship['angle'] = orig_angle
 
@@ -432,7 +438,7 @@ def game():
         handle_movement(hazards, HAZARD_SPEED, rotate=True)
         handle_movement(powerups, POWERUP_SPEED)
         handle_collisions(spaceship, shots, hazards, powerups)
-        draw([spaceship, *shots, *hazards, *powerups], score, life, ammo, font)
+        draw([*shots, spaceship, *hazards, *powerups], score, life, ammo, font)
 
     return to_quit
 
@@ -451,7 +457,7 @@ def main():
                 font = pygame.font.SysFont('monospace', 50, bold=True)
                 lost_text = font.render('GAME OVER!', 1, GAME_OVER_TEXT_COLOR)
                 font = pygame.font.SysFont('monospace', 30, bold=True)
-                instructions = font.render('Press Enter to restart, q to quit', 1, GAME_OVER_TEXT_COLOR)
+                instructions = font.render('Press Enter to restart, Escape to quit', 1, GAME_OVER_TEXT_COLOR)
 
                 WIN.blit(lost_text, get_top_left(lost_text, CENTER))
                 WIN.blit(instructions, get_top_left(instructions, (CENTER[0] - instructions.get_size()[1] / 2, CENTER[1] + 50)))
@@ -463,7 +469,7 @@ def main():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
                     start = True
-                if event.key == pygame.K_q:
+                if event.key == pygame.K_ESCAPE:
                     to_quit = True
 
     pygame.quit()
