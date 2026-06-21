@@ -18,6 +18,8 @@ LEFT, RIGHT, TOP, BOTTOM = EDGES
 SPACESHIP_TYPE = 0
 SPACESHIP_HEIGHT = WIN_HEIGHT * (17/135)
 SPACESHIP_IMAGE_PATH = 'assets\\spaceship.png'
+TITLE_IMAGE_PATH = 'assets\\title.png'
+GAME_OVER_PATH = 'assets\\gameover.png'
 SPACESHIP_MAX_SPEED = WIN_HEIGHT / 200
 SPACESHIP_SPEED_INCREMENTS = SPACESHIP_MAX_SPEED / 50
 SPACESHIP_MAX_ROTATE_SPEED = WIN_HEIGHT / 350
@@ -72,12 +74,14 @@ POWERUP_COLLECTED_EVENT = pygame.USEREVENT + 2
 OBJECT_OUT_OF_SCREEN_EVENT = pygame.USEREVENT + 3
 BACKGROUND_COLOR = (20, 20, 20)
 
-GAME_OVER_TEXT_COLOR = (235, 163, 70)
 FONT = 'Times New Roman'
+TITLE_HEIGHT = WIN_HEIGHT / 5
+TITLE_FONT_SIZE = int(WIN_HEIGHT / 16)
+INSTRUCTIONS_COLOR = (0, 255, 255)
+
+GAME_FONT_SIZE = int(WIN_HEIGHT / 15)
 SCORE_TEXT_COLOR = (144, 213, 255)
 AMMO_TEXT_COLOR = (200,200,200)
-GAME_FONT_SIZE = int(WIN_HEIGHT / 15)
-GAME_OVER_FONT_SIZE = int(WIN_HEIGHT / 8)
 
 HEART_RADIUS = WIN_HEIGHT / 108
 HEART_COLOR = (255, 0, 0)
@@ -517,31 +521,74 @@ def game(physics_enabled=False):
 
         handle_collisions(spaceship, shots, hazards, powerups)
         draw([*shots, spaceship, *hazards, *powerups], score, life, ammo, font)
-    return to_quit
+
+    return score if not to_quit else -1
+
+def game_over_screen(score, high_score):
+    """
+        Displays game over screen over the current one
+    """
+    game_over_image = pygame.image.load(GAME_OVER_PATH)
+    game_over_image = pygame.transform.scale(game_over_image, ((game_over_image.get_width() / game_over_image.get_height()) * TITLE_HEIGHT, TITLE_HEIGHT))
+    font = pygame.font.SysFont(FONT, TITLE_FONT_SIZE//2, bold=True)
+    to_blit = [font.render('Score: ' + str(score), 1, INSTRUCTIONS_COLOR),
+               font.render('High Score: ' + str(high_score), 1, INSTRUCTIONS_COLOR),
+               font.render('Press Enter to restart, Escape to quit', 1, INSTRUCTIONS_COLOR)]
+
+    WIN.blit(game_over_image, get_top_left(game_over_image, CENTER))
+    
+    top_left = get_top_left(game_over_image, CENTER)
+    WIN.blit(game_over_image, top_left)
+    top = top_left[1] + game_over_image.get_height()
+
+    for surf in to_blit:
+        WIN.blit(surf, ((WIN_WIDTH - surf.get_width())/ 2, top))
+        top += surf.get_height()
+    pygame.display.update()
+
+def title_screen():
+    """
+        Displays title screen
+    """
+    WIN.fill(BACKGROUND_COLOR)
+    font = pygame.font.SysFont(FONT, TITLE_FONT_SIZE, bold=True)
+    title_image = pygame.image.load(TITLE_IMAGE_PATH)
+    title_image = pygame.transform.scale(title_image, ((title_image.get_width() / title_image.get_height()) * TITLE_HEIGHT, TITLE_HEIGHT))
+    to_blit = [font.render('Welcome to space!', 1, INSTRUCTIONS_COLOR), 
+               font.render('Press enter to start, escape to quit!', 1, INSTRUCTIONS_COLOR), 
+               font.render('Control your spaceship with the arrow keys!', 1, INSTRUCTIONS_COLOR),
+               font.render('Avoid asteroids and shoot them with spacebar!', 1, INSTRUCTIONS_COLOR),
+               font.render('Collect powerups to get more ammo, lives and other effects!', 1, INSTRUCTIONS_COLOR),
+               font.render('For a real challenge, press p to enable physics mode!', 1, INSTRUCTIONS_COLOR)]
+    
+    top_left = get_top_left(title_image, (WIN_WIDTH / 2, WIN_HEIGHT / 4))
+    WIN.blit(title_image, top_left)
+    top = top_left[1] + title_image.get_height() + TITLE_FONT_SIZE
+    for surf in to_blit:
+        WIN.blit(surf, ((WIN_WIDTH - surf.get_width())/ 2, top))
+        top += surf.get_height()
+
+    pygame.display.update()
 
 def main():
     """
         Main function, calls the game and allows restarting
     """
     pygame.init()
-    start = True
+    start = False
     to_quit = False
     physics_enabled = False
+    high_score = 0
+    title_screen()
     while not to_quit:
         if start:
-            to_quit = game(physics_enabled)
+            score = game(physics_enabled)
             start = False
-            if not to_quit:
-                font = pygame.font.SysFont(FONT, GAME_OVER_FONT_SIZE, bold=True)
-                lost_text = font.render('GAME OVER!', 1, GAME_OVER_TEXT_COLOR)
-                font = pygame.font.SysFont(FONT, GAME_OVER_FONT_SIZE//2, bold=True)
-                instructions = font.render('Press Enter to restart, Escape to quit', 1, GAME_OVER_TEXT_COLOR)
-                physics_description = font.render('Press p to toggle physics mode', 1, GAME_OVER_TEXT_COLOR)
-                WIN.blit(lost_text, get_top_left(lost_text, CENTER))
-                WIN.blit(instructions, get_top_left(instructions, (CENTER[0] - instructions.get_size()[1] / 2, CENTER[1] + GAME_OVER_FONT_SIZE)))
-                WIN.blit(physics_description, get_top_left(physics_description, (CENTER[0] - physics_description.get_size()[1] / 2, CENTER[1] + GAME_OVER_FONT_SIZE * 1.5)))
-                pygame.display.update()
-
+            if score == -1:
+                to_quit = True
+            else:
+                high_score = max(score, high_score)
+                game_over_screen(score, high_score)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 to_quit = True
