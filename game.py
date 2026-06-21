@@ -4,6 +4,11 @@ import random
 import os
 pygame.init()
 
+HIGH_SCORE_PATH = 'high.txt'
+SPACESHIP_IMAGE_PATH = 'assets\\spaceship.png'
+TITLE_IMAGE_PATH = 'assets\\title.png'
+GAME_OVER_PATH = 'assets\\gameover.png'
+
 INFO = pygame.display.Info()
 WIN_WIDTH = INFO.current_w
 WIN_HEIGHT = INFO.current_h
@@ -17,9 +22,6 @@ LEFT, RIGHT, TOP, BOTTOM = EDGES
 
 SPACESHIP_TYPE = 0
 SPACESHIP_HEIGHT = WIN_HEIGHT * (17/135)
-SPACESHIP_IMAGE_PATH = 'assets\\spaceship.png'
-TITLE_IMAGE_PATH = 'assets\\title.png'
-GAME_OVER_PATH = 'assets\\gameover.png'
 SPACESHIP_MAX_SPEED = WIN_HEIGHT / 200
 SPACESHIP_SPEED_INCREMENTS = SPACESHIP_MAX_SPEED / 50
 SPACESHIP_MAX_ROTATE_SPEED = WIN_HEIGHT / 350
@@ -530,7 +532,7 @@ def game_over_screen(score, high_score):
     """
     game_over_image = pygame.image.load(GAME_OVER_PATH)
     game_over_image = pygame.transform.scale(game_over_image, ((game_over_image.get_width() / game_over_image.get_height()) * TITLE_HEIGHT, TITLE_HEIGHT))
-    font = pygame.font.SysFont(FONT, TITLE_FONT_SIZE//2, bold=True)
+    font = pygame.font.SysFont(FONT, TITLE_FONT_SIZE, bold=True)
     to_blit = [font.render('Score: ' + str(score), 1, INSTRUCTIONS_COLOR),
                font.render('High Score: ' + str(high_score), 1, INSTRUCTIONS_COLOR),
                font.render('Press Enter to restart, Escape to quit', 1, INSTRUCTIONS_COLOR)]
@@ -574,11 +576,16 @@ def main():
     """
         Main function, calls the game and allows restarting
     """
+    try:
+        score_file = open(HIGH_SCORE_PATH)
+        high_score = int(score_file.read().strip())
+        score_file.close()
+    except:
+        high_score = 0
     pygame.init()
     start = False
     to_quit = False
     physics_enabled = False
-    high_score = 0
     title_screen()
     while not to_quit:
         if start:
@@ -600,6 +607,12 @@ def main():
                 if event.key == pygame.K_p:
                     physics_enabled = not physics_enabled
 
+    try:
+        score_file = open(HIGH_SCORE_PATH, 'w')
+        score_file.write(str(high_score))
+        score_file.close()
+    except:
+        print('Couldn\'t save high score')
     pygame.quit()
 
 if __name__ == '__main__':
